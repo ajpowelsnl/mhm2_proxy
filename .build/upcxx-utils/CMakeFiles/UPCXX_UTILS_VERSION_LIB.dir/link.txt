@@ -1,2 +1,0 @@
-/usr/bin/ar qc libUPCXX_UTILS_VERSION_LIB.a  CMakeFiles/UPCXX_UTILS_VERSION.dir/makeVersionFile/version.cpp.o
-/usr/bin/ranlib libUPCXX_UTILS_VERSION_LIB.a
