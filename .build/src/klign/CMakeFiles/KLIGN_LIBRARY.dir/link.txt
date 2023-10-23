@@ -1,2 +1,0 @@
-/usr/bin/ar qc libKLIGN_LIBRARY.a  CMakeFiles/KLIGN_LIBRARY.dir/klign-extern-template-32.cpp.o CMakeFiles/KLIGN_LIBRARY.dir/klign-extern-template-64.cpp.o CMakeFiles/KLIGN_LIBRARY.dir/klign-extern-template-96.cpp.o CMakeFiles/KLIGN_LIBRARY.dir/klign-extern-template-128.cpp.o CMakeFiles/aligner_cpu.dir/aligner_cpu.cpp.o CMakeFiles/block_align_cpu.dir/block_align_cpu.cpp.o
-/usr/bin/ranlib libKLIGN_LIBRARY.a

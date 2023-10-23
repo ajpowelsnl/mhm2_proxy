@@ -1,2 +1,0 @@
-/usr/bin/ar qc libSSW_LIBRARY.a  CMakeFiles/SSW_LIBRARY.dir/ssw.cpp.o CMakeFiles/SSW_LIBRARY.dir/ssw_core.cpp.o
-/usr/bin/ranlib libSSW_LIBRARY.a

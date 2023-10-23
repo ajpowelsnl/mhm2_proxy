@@ -1,2 +1,0 @@
-/usr/bin/ar qc libMHM2_VERSION_LIB.a  CMakeFiles/MHM2_VERSION.dir/makeVersionFile/version.cpp.o
-/usr/bin/ranlib libMHM2_VERSION_LIB.a

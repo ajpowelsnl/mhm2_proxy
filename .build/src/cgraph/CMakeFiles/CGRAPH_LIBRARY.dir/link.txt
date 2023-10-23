@@ -1,2 +1,0 @@
-/usr/bin/ar qc libCGRAPH_LIBRARY.a  CMakeFiles/cgraph.dir/cgraph.cpp.o CMakeFiles/build_ctg_graph.dir/build_ctg_graph.cpp.o CMakeFiles/ctg_graph.dir/ctg_graph.cpp.o CMakeFiles/walk_ctg_graph.dir/walk_ctg_graph.cpp.o CMakeFiles/spanner.dir/spanner.cpp.o CMakeFiles/splinter.dir/splinter.cpp.o
-/usr/bin/ranlib libCGRAPH_LIBRARY.a

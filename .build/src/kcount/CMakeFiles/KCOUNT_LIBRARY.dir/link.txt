@@ -1,2 +1,0 @@
-/usr/bin/ar qc libKCOUNT_LIBRARY.a  CMakeFiles/KCOUNT_LIBRARY.dir/kcount-extern-template-32.cpp.o CMakeFiles/KCOUNT_LIBRARY.dir/kcount-extern-template-64.cpp.o CMakeFiles/KCOUNT_LIBRARY.dir/kcount-extern-template-96.cpp.o CMakeFiles/KCOUNT_LIBRARY.dir/kcount-extern-template-128.cpp.o CMakeFiles/kmer_dht.dir/kmer_dht.cpp.o CMakeFiles/kcount_cpu.dir/kcount_cpu.cpp.o
-/usr/bin/ranlib libKCOUNT_LIBRARY.a

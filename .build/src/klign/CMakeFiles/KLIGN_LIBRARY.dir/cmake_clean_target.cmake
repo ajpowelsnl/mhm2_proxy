@@ -1,3 +1,0 @@
-file(REMOVE_RECURSE
-  "libKLIGN_LIBRARY.a"
-)

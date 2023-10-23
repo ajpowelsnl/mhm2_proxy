@@ -1,2 +1,0 @@
-/usr/bin/ar qc libLOCALASSM_LIBRARY.a  CMakeFiles/localassm.dir/localassm.cpp.o CMakeFiles/localassm_core.dir/localassm_core.cpp.o CMakeFiles/localassm_cpu.dir/localassm_cpu.cpp.o
-/usr/bin/ranlib libLOCALASSM_LIBRARY.a
