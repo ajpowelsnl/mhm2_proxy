@@ -51,7 +51,7 @@
 #include "upcxx_utils/log.hpp"
 #include "upcxx_utils/mem_profile.hpp"
 
-#include "upcxx_utils/timers.hpp"
+
 #include "zstr.hpp"
 
 #include "kmer_dht.hpp"
@@ -115,8 +115,7 @@ KmerDHT<MAX_K>::KmerDHT(uint64_t my_num_kmers, int max_kmer_store_bytes, int max
   if (minimizer_len < 15) minimizer_len = 15;
   if (minimizer_len > 27) minimizer_len = 27;
   SLOG_VERBOSE("Using a minimizer length of ", minimizer_len, "\n");
-  // main purpose of the timer here is to track memory usage
-  BarrierTimer timer(__FILEFUNC__);
+  
   auto node0_cores = upcxx::local_team().rank_n();
   // check if we have enough memory to run - conservative because we don't want to run out of memory
   double adjustment_factor = 0.2;
@@ -226,7 +225,6 @@ void KmerDHT<MAX_K>::add_supermer(Supermer &supermer, int target_rank) {
 
 template <int MAX_K>
 void KmerDHT<MAX_K>::flush_updates() {
-  BarrierTimer timer(__FILEFUNC__);
   kmer_store.flush_updates();
   barrier();
   ht_inserter->flush_inserts();
@@ -235,8 +233,6 @@ void KmerDHT<MAX_K>::flush_updates() {
 template <int MAX_K>
 void KmerDHT<MAX_K>::finish_updates() {
   ht_inserter->insert_into_local_hashtable(local_kmers);
-  double insert_time, kernel_time;
-  ht_inserter->get_elapsed_time(insert_time, kernel_time);
 }
 
 // one line per kmer, format:
@@ -245,7 +241,7 @@ void KmerDHT<MAX_K>::finish_updates() {
 // where N is the count of the kmer frequency
 template <int MAX_K>
 void KmerDHT<MAX_K>::dump_kmers() {
-  BarrierTimer timer(__FILEFUNC__);
+  
   int k = Kmer<MAX_K>::get_k();
   string dump_fname = "kmers-" + to_string(k) + ".txt.gz";
   get_rank_path(dump_fname, rank_me());
@@ -279,11 +275,7 @@ typename KmerMap<MAX_K>::iterator KmerDHT<MAX_K>::local_kmers_end() {
   return local_kmers->end();
 }
 
-template <int MAX_K>
-int32_t KmerDHT<MAX_K>::get_time_offset_us() {
-  std::chrono::duration<double> t_elapsed = CLOCK_NOW() - start_t;
-  return std::chrono::duration_cast<std::chrono::microseconds>(t_elapsed).count();
-}
+
 
 #define KMER_DHT_K(KMER_LEN) template class KmerDHT<KMER_LEN>
 

@@ -16,13 +16,6 @@ void TT_RPC_Counts::reset() {
 TT_All_RPC_Counts::TT_All_RPC_Counts(DistFASRPCCounts &dist_fas_rpc_counts)
     : total()
     , targets{}
-    , wait_for_rpcs_timer("3Tier::wait_for_rpcs")
-    , append_shared_store_timer("3Tier::append_shared_store")
-    , prep_rpc_timer("3Tier::prep_rpc")
-    , rpc_outer_timer("3Tier::rpc_outer")
-    , rpc_inner_timer("3Tier::rpc_inner")
-    , append_micro_store_timer("3Tier::append_micro_store")
-    , progress_timer("3Tier::progress")
     , inner_rpc_future(make_future())
     , fas_rpc_counts(dist_fas_rpc_counts) {
   DBG_VERBOSE(this, " Default Constructor\n");
@@ -84,23 +77,11 @@ void TT_All_RPC_Counts::reset(bool free) {
     }
   }
   if (free) targets.clear();
-  wait_for_rpcs_timer.clear();
-  append_shared_store_timer.clear();
-  append_micro_store_timer.clear();
-  prep_rpc_timer.clear();
-  rpc_outer_timer.clear();
-  rpc_inner_timer.clear();
-  progress_timer.clear();
+  
 }
 
 void TT_All_RPC_Counts::print_out() {
-  wait_for_rpcs_timer.print_out();
-  append_shared_store_timer.print_out();
-  append_micro_store_timer.print_out();
-  prep_rpc_timer.print_out();
-  rpc_outer_timer.print_out();
-  rpc_inner_timer.print_out();
-  progress_timer.print_out();
+  
 }
 
 void TT_All_RPC_Counts::increment_sent_counters(intrank_t target_node) {
@@ -138,8 +119,7 @@ void TT_All_RPC_Counts::wait_for_rpcs(intrank_t target_node, CountType max_rpcs_
   // every process is sending and receiving about the same number)
   // we don't actually want to check every possible rank's count while waiting, so just check the target rank
 
-  wait_for_rpcs_timer.start();
-
+  
   bool imbalanced = false;
   auto &tgt = *targets[target_node].local();
   auto tgt_imbalance_factor = tgt.imbalance_factor.load();  // copy the imbalance factor
@@ -160,7 +140,7 @@ void TT_All_RPC_Counts::wait_for_rpcs(intrank_t target_node, CountType max_rpcs_
     while (tgt_rpcs_sent - tgt_rpcs_processed > max_per_rank && tgt_rpcs_sent - tgt_rpcs_progressed > max_per_rank &&
            tot_rpcs_sent - tot_rpcs_processed > max_rpcs_in_flight && tot_rpcs_sent - tot_rpcs_progressed > max_rpcs_in_flight) {
       iter++;
-      progress_timer.progress();
+      
       bool target_is_in_flush = iter > max_per_rank && tgt_rpcs_expected > 0;
       bool target_is_imbalanced = !target_is_in_flush && iter > (max_rpcs_in_flight + 1) * tgt_imbalance_factor;
       if ((target_is_in_flush || target_is_imbalanced) && !upcxx::progress_required()) {
@@ -183,7 +163,7 @@ void TT_All_RPC_Counts::wait_for_rpcs(intrank_t target_node, CountType max_rpcs_
   if (!imbalanced) {
     tgt.imbalance_factor = 1;
   }
-  wait_for_rpcs_timer.stop();
+  
   DBG("tt_wait_for_rpcs() finished waiting target_node=", target_node, " tot_rpcs_sent=", total.local()->rpcs_sent.load(),
       " rpcs_to_node=", targets[target_node].local()->rpcs_sent.load(),
       " processed_from_node=", targets[target_node].local()->rpcs_processed.load(), "\n");
@@ -212,7 +192,7 @@ void TT_All_RPC_Counts::update_progressed_count(TTDistRPCCounts &dist_tt_rpc_cou
                          dtt_rpc_counts, dtt_rpc_counts.team().rank_me(), processed);
                 },
                 dist_tt_rpc_counts, me, targets[target_node].local()->rpcs_progressed.load());
-  this->progress_timer.progress();  // call progress after every rpc
+  
 }
 
 };  // namespace upcxx_utils

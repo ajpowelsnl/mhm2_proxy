@@ -2,6 +2,7 @@
 
 namespace upcxx_utils {
 
+
 TargetRPCCounts::TargetRPCCounts() { reset(); }
 
 void TargetRPCCounts::reset() {
@@ -15,12 +16,6 @@ void TargetRPCCounts::reset() {
 FASRPCCounts::FASRPCCounts(const upcxx::team &tm)
     : total()
     , targets()
-    , rpc_prep_timer("FlatAggrStore::prep_rpc")
-    , rpc_inner_timer("FlatAggrStore::inner_rpc")
-    , rpc_outer_timer("FlatAggrStore::outer_rpc")
-    , wait_for_rpcs_timer("FlatAggrStore::wait_for_rpcs")
-    , append_store_timer("FlatAggrStore::append_store")
-    , progress_timer("FlatAggrStore::progress")
     , tm(tm) {}
 
 void FASRPCCounts::init() {
@@ -30,28 +25,18 @@ void FASRPCCounts::init() {
 
 void FASRPCCounts::reset() {
   // explicitly world reduction not aggr_team!
-  auto has_counts = upcxx::reduce_all(total.rpcs_sent + total.rpcs_processed, upcxx::op_fast_add, world()).wait();
+  auto has_counts = upcxx::reduce_all(total.rpcs_sent + total.rpcs_processed, upcxx::op_fast_add, upcxx::world()).wait();
   if (has_counts) print_out();
   total.reset();
   for (auto &t : targets) {
     t.reset();
   }
-  rpc_prep_timer.clear();
-  rpc_inner_timer.clear();
-  rpc_outer_timer.clear();
-  wait_for_rpcs_timer.clear();
-  append_store_timer.clear();
-  progress_timer.clear();
+  
 }
 
 void FASRPCCounts::print_out() {
   // explicitly world reduction not aggr_team!
-  wait_for_rpcs_timer.print_out(world());
-  rpc_prep_timer.print_out(world());
-  rpc_outer_timer.print_out(world());
-  rpc_inner_timer.print_out(world());
-  append_store_timer.print_out(world());
-  progress_timer.print_out(world());
+  
 }
 
 void FASRPCCounts::increment_sent_counters(intrank_t target_rank) {
@@ -86,7 +71,7 @@ void FASRPCCounts::wait_for_rpcs(intrank_t target_rank, CountType max_rpcs_in_fl
   // every process is sending and receiving about the same number)
   // we don't actually want to check every possible rank's count while waiting, so just check the target rank
 
-  wait_for_rpcs_timer.start();
+  
   bool imbalanced = false;
   CountType max_per_rank = (max_rpcs_in_flight + targets.size() - 1) / targets.size();
   max_per_rank = std::min(max_per_rank, (CountType)4);  // always allow a minimum of 4 outstanding per rank.
@@ -106,7 +91,7 @@ void FASRPCCounts::wait_for_rpcs(intrank_t target_rank, CountType max_rpcs_in_fl
     while (tgt_rpcs_sent - tgt_rpcs_processed > max_per_rank && tgt_rpcs_sent - tgt_rpcs_progressed > max_per_rank &&
            rpcs_sent - rpcs_processed > max_rpcs_in_flight && rpcs_sent - rpcs_progressed > max_rpcs_in_flight) {
       iter++;
-      progress_timer.progress();
+      
       bool target_is_in_flush = iter > max_per_rank && tgt_rpcs_expected > 0;
       bool target_is_imbalanced = !target_is_in_flush && iter > (max_rpcs_in_flight + 1) * tgt_balance_factor;
       if ((target_is_in_flush || target_is_imbalanced) && !upcxx::progress_required()) {
@@ -127,7 +112,7 @@ void FASRPCCounts::wait_for_rpcs(intrank_t target_rank, CountType max_rpcs_in_fl
     }
   }
   if (!imbalanced) tgt_balance_factor = 1;
-  wait_for_rpcs_timer.stop();
+  
 }
 
 void FASRPCCounts::update_progressed_count(DistFASRPCCounts &dist_fas_rpc_counts, intrank_t target_rank) {
@@ -153,7 +138,7 @@ void FASRPCCounts::update_progressed_count(DistFASRPCCounts &dist_fas_rpc_counts
                          dfas_rpc_counts, dfas_rpc_counts.team().rank_me(), processed);
                 },
                 dist_fas_rpc_counts, me, targets[target_rank].rpcs_progressed);
-  this->progress_timer.progress();  // call progress after every rpc
+  
 }
 
 };  // namespace upcxx_utils

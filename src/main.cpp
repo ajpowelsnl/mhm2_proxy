@@ -76,7 +76,6 @@ int main(int argc, char **argv) {
   if (!options->load(argc, argv)) return 127;
   SLOG_VERBOSE("Executed as: ", executed, "\n");
   
-  //ProgressBar::SHOW_PROGRESS = options->show_progress;
   auto max_kmer_store = options->max_kmer_store_mb * ONE_MB;
 
   SLOG_VERBOSE("Process 0 on node 0 is initially pinned to ", get_proc_pin(), "\n");
@@ -169,7 +168,7 @@ int main(int argc, char **argv) {
       max_kmer_len = options->kmer_lens.back();
       for (auto kmer_len : options->kmer_lens) {
         auto max_k = (kmer_len / 32 + 1) * 32;
-        LOG(upcxx_utils::GasNetVars::getUsedShmMsg(), "\n");
+        //LOG(upcxx_utils::GasNetVars::getUsedShmMsg(), "\n");
 
     #define CONTIG_K(KMER_LEN)                                                                                                         \
     case KMER_LEN:                                                                                                                   \
@@ -229,7 +228,7 @@ int main(int argc, char **argv) {
 
 
   upcxx_utils::ThreadPool::join_single_pool();  // cleanup singleton thread pool
-  upcxx_utils::Timings::wait_pending();         // ensure all outstanding timing summaries have printed
+  //upcxx_utils::Timings::wait_pending();         // ensure all outstanding timing summaries have printed
   barrier();
 
 #ifdef DEBUG

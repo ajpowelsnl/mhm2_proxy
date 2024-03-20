@@ -55,7 +55,7 @@ class upcxx_utils::ThreadPool_detail {
 #else
   std::vector<std::thread> workers;
 #endif
-  std::vector<IntermittentTimer> worker_timers;
+  //std::vector<IntermittentTimer> worker_timers;
 
   // the task queue
   using Task = std::function<void()>;  // void(void) function/lambda wrappers
@@ -106,7 +106,7 @@ class upcxx_utils::ThreadPool_detail {
       if (new_max_workers == 0 && !workers.empty()) DIE("Cannot set max_workers to 0 before joining workers");
       max_workers.store(new_max_workers);
       workers.reserve(new_max_workers);
-      worker_timers.reserve(new_max_workers);
+      //worker_timers.reserve(new_max_workers);
     }
 #endif
   }
@@ -169,7 +169,7 @@ class upcxx_utils::ThreadPool_detail {
       task_ready.notify_all();
 
       if (workers.empty()) {
-        assert(worker_timers.empty());
+        //assert(worker_timers.empty());
         if (upcxx::initialized()) DBG("No workers to join\n");
       } else {
         assert(upcxx::master_persona().active_with_caller() && "Called from master persona while upcxx is still active");
@@ -201,11 +201,11 @@ class upcxx_utils::ThreadPool_detail {
     assert(workers.empty() && "Workers are all joined");
     assert(tasks.empty() && "All tasks are complete");
     assert(is_done() && "ThreadPool is now done");
-    for (auto &timer : worker_timers) {
-      assert(upcxx::master_persona().active_with_caller() && "Called from master persona while upcxx is still active");
-      LOG("Worker joined after executing ", timer.get_count(), " tasks over ", timer.get_elapsed(), " s.\n");
-    }
-    worker_timers.clear();
+    //for (auto &timer : worker_timers) {
+    //  assert(upcxx::master_persona().active_with_caller() && "Called from master persona while upcxx is still active");
+     // LOG("Worker joined after executing ", timer.get_count(), " tasks over ", timer.get_elapsed(), " s.\n");
+   // }
+    //worker_timers.clear();
   }
 
   void reset(int num_workers) {
@@ -224,10 +224,11 @@ class upcxx_utils::ThreadPool_detail {
 #else
     Lock lock(workers_mutex);                                 // modifying workers, so lock
     if (is_stop() | (workers.size() >= max_workers)) return;  // cannot exceed the max_workers
-    worker_timers.emplace_back("ThreadWorkerTimer");
-    workers.emplace_back([this, &timer = worker_timers.back()] {
+    //worker_timers.emplace_back("ThreadWorkerTimer");
+    //workers.emplace_back([this, &timer = worker_timers.back()] {
+      workers.emplace_back([this] {
       DBG_VERBOSE(std::this_thread::get_id(), " just started\n");
-      auto start_time = Timer::now();
+      //auto start_time = Timer::now();
       duration_seconds wait_for_max(0.25);
       while (true) {
         Task task;
@@ -252,17 +253,17 @@ class upcxx_utils::ThreadPool_detail {
           needs_notify = (this->ready_workers.load() > 0) & !this->tasks.empty();
         }
         if (needs_notify) this->task_ready.notify_one();  // just popped one of several tasks, and a worker was observed ready
-        DBG_VERBOSE(std::this_thread::get_id(), " popped task# ", timer.get_count(), "\n");
-        timer.start();
+        //DBG_VERBOSE(std::this_thread::get_id(), " popped task# ", timer.get_count(), "\n");
+        //timer.start();
         task();  // execute
-        DBG_VERBOSE(std::this_thread::get_id(), " done with task# ", timer.get_count(), " in ", timer.get_elapsed_since_start(),
-                    " s\n");
-        timer.stop();
+        //DBG_VERBOSE(std::this_thread::get_id(), " done with task# ", timer.get_count(), " in ", timer.get_elapsed_since_start(),
+                   // " s\n");
+        //timer.stop();
         this->task_ready.notify_one();  // this thread will soon be ready for a new task itself
       }
-      duration_seconds lifetime = Timer::now() - start_time;
-      DBG(std::this_thread::get_id(), " terminated. executed ", timer.get_count(), " tasks in ", timer.get_elapsed(),
-          " s, lifetime ", lifetime.count(), " s\n");
+      //duration_seconds lifetime = Timer::now() - start_time;
+      //DBG(std::this_thread::get_id(), " terminated. executed ", timer.get_count(), " tasks in ", timer.get_elapsed(),
+      //    " s, lifetime ", lifetime.count(), " s\n");
       this->task_ready.notify_all();  // exiting, notify any straggling threads too
     });
 #endif

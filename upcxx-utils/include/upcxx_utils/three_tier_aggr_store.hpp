@@ -13,7 +13,6 @@
 #include "upcxx_utils/log.hpp"
 #include "upcxx_utils/shared_array.hpp"
 #include "upcxx_utils/split_rank.hpp"
-#include "upcxx_utils/timers.hpp"
 
 using std::atomic;
 using std::numeric_limits;
@@ -275,9 +274,7 @@ struct TT_All_RPC_Counts {
 
   global_ptr<TT_RPC_Counts> total;
   vector<global_ptr<TT_RPC_Counts>> targets;
-  IntermittentTimer wait_for_rpcs_timer, append_shared_store_timer, prep_rpc_timer, rpc_outer_timer, rpc_inner_timer,
-      append_micro_store_timer;
-  ProgressTimer progress_timer;
+  
   upcxx::future<> inner_rpc_future;
   DistFASRPCCounts &fas_rpc_counts;  // reference to flat_aggr_store dist_object counts (but using a different (local) team)
 };
@@ -383,16 +380,16 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
     rpc_ff(astore->splits->full_team(), full_rank,
            [](DistUpdateFunc &update_func, T elem, TTDistRPCCounts &tt_rpc_counts, node_num_t source_node,
               CountType progressed_count, Data &... data) {
-             tt_rpc_counts->rpc_inner_timer.start();
+             
              DBG_VERBOSE("tt_update_remote1()::rpc_ff source_node = ", source_node,
                          ", already_processed=", (*tt_rpc_counts).targets[source_node].local()->rpcs_processed.load(), "\n");
              tt_rpc_counts->set_progressed_count(source_node, progressed_count);
              (*update_func)(elem, data...);
              tt_rpc_counts->increment_processed_counters(source_node);
-             tt_rpc_counts->rpc_inner_timer.stop();
+             
            },
            astore->update_func, elem, astore->tt_rpc_counts, astore->splits->node_me(), progressed_count, data...);
-    astore->tt_rpc_counts->progress_timer.progress();  // call progress after firing a rpc
+    
   }
 
   template <typename SATYPE = SharedArray2<T, TT_SIZE_T>>
@@ -402,7 +399,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
     auto progressed_count = astore->tt_rpc_counts->targets[target_node].local()->rpcs_processed.load();
     auto &counts = sorted_array.get_counts();
 
-    astore->tt_rpc_counts->rpc_outer_timer.start();
+    
     rpc_ff(
         astore->splits->node_team(), target_node,
         [](DistUpdateFunc &update_func, view<T> node_store_view, view<TT_SIZE_T> thread_sizes, TTDistRPCCounts &tt_rpc_counts,
@@ -416,7 +413,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
 
           // Double View of this relay/scatter
 
-          tt_rpc_counts->rpc_inner_timer.start();
+          
 
           vector<TT_SIZE_T> thread_offsets(splits->thread_n(), 0);
           for (thread_num_t i = 1; i < splits->thread_n(); i++) {
@@ -452,8 +449,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
               DBG_VERBOSE("Sending to thread_num=", thread_num, ", size=", thread_sizes[thread_num], " offset=", offset, "\n");
 
               FAS::increment_rpc_counters(rpc_counts, thread_num);
-              rpc_counts->rpc_outer_timer.start();
-
+              
               auto send_start_iter = thread_iter;
               for (size_t i = 0; i < thread_sizes[thread_num]; i++) {
                 assert(thread_iter != node_store_view.end());
@@ -471,7 +467,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
                                  hh,
 #endif
                                  rpc_counts, thread_team.rank_me(), rpc_counts->targets[thread_num].rpcs_processed, data...);
-              rpc_counts->rpc_outer_timer.stop();
+              
               relay_done_fut = when_all(relay_done_fut, fut);
             }
 
@@ -479,7 +475,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
           }
           assert(thread_iter == end_iter);
 
-          tt_rpc_counts->rpc_inner_timer.stop();
+          
           relay_done_fut = relay_done_fut.then([&tt_rpc_counts, source_node]() {
             tt_rpc_counts->increment_processed_counters(source_node);
             DBG_VERBOSE("Finished inner tt_remote_rpc_ff from ", source_node, "\n");
@@ -492,14 +488,13 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
         make_view(counts.begin(), counts.end()), astore->tt_rpc_counts, astore->splits->node_me(), progressed_count, astore->splits,
         data...);
 
-    astore->tt_rpc_counts->rpc_outer_timer.stop();
-    astore->tt_rpc_counts->progress_timer.progress();  // call progress after every rpc
+    
   }
 
   // operates on a vector of elements in the store
 
   static void tt_update_remote(ThreeTierAggrStore *astore, node_num_t target_node, Data &... data) {
-    astore->tt_rpc_counts->prep_rpc_timer.start();
+    
     assert(target_node < astore->splits->node_n());
     assert(astore->tt_pool_allocator && "Pool allocator is intialized");
     assert(target_node != astore->splits->node_me() && "Not a node covered by FlatAggrStore");
@@ -515,23 +510,22 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
     // TODO support HHSS which may still have entries when nodestore is empty...
 #endif
 
-    if (nodestore.empty()) {
-      astore->tt_rpc_counts->prep_rpc_timer.stop();
-      return;
-    }
-
+    if (nodestore.empty())       return;
+    
     // first allocate a new pointer there should always be >=1 available in the local team
     // but there may be races to find it
     global_ptr<T> new_ptr;
     do {
       new_ptr = astore->tt_pool_allocator.allocate(astore->splits->thread_team());
       if (!new_ptr.is_null()) break;
-      astore->tt_rpc_counts->progress_timer.progress();
+      
     } while (true);
 
     // now wait for all appends to complete, this likely has already happened
-    while (!nodestore.ready()) astore->tt_rpc_counts->progress_timer.progress();
-    assert(nodestore.ready());
+      int i=0;
+   
+      while (!nodestore.ready()) i+=0;
+      assert(nodestore.ready());
 
     // swap the pointers and reset NodeStore for other ranks to use asap
     global_ptr<T> full_ptr = nodestore.get_global_ptr();
@@ -560,8 +554,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
       i++;
     }
 #endif
-    astore->tt_rpc_counts->prep_rpc_timer.stop();
-
+    
     // send the rpc
     tt_remote_rpc_ff(astore, target_node, sorted_array, data...);
 
@@ -571,7 +564,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
 
   template <typename iter1, typename iter2>
   void append_shared_store(node_num_t target_node, iter1 begin1, iter2 begin2, size_t size) {
-    tt_rpc_counts->append_shared_store_timer.start();
+    
     DBG_VERBOSE("3TAS::append_shared_store() target_node=", target_node, " size=", size, " node_store=", tt_store[target_node],
                 "\n");
     SharedArrayStore &node_store = *(tt_store[target_node].local());
@@ -583,10 +576,10 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
         // appended all remaining and SharedArrayStore is not full
         break;
       } else {
-        tt_rpc_counts->append_shared_store_timer.stop();
+        
         if (appended_len == 0) {
           // node_store is full and can not proceed.  Some other rank is working to resolve it already
-          tt_rpc_counts->progress_timer.progress();
+            int k=0;
         } else {
           assert(appended_len <= size - offset);
           // send this full NodeStore
@@ -594,10 +587,10 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
           offset += appended_len;
           // continue and append remainder, if any
         }
-        tt_rpc_counts->append_shared_store_timer.start();
+        
       }
     } while (size - offset > 0);
-    tt_rpc_counts->append_shared_store_timer.stop();
+    
   }
 
   void append_shared_store(node_num_t node_num) {
@@ -935,7 +928,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
     const T &elem = _elem;
 #endif
     if (tt_max_micro_store_size_per_node > 1) {
-      tt_rpc_counts->append_micro_store_timer.start();
+      
 
       TT_SIZE_T thread_num = splits->thread_from_full(target_rank);
       node_num_t node_num = splits->node_from_full(target_rank);
@@ -946,15 +939,14 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
       assert(micro_store.first.size() < tt_max_micro_store_size_per_node);
       micro_store.first.push_back(elem);
       micro_store.second.push_back(thread_num);
-      tt_rpc_counts->append_micro_store_timer.stop();
-
+     
       if (micro_store.first.size() == tt_max_micro_store_size_per_node) {
         assert(!micro_store.first.empty());
         append_shared_store(node_num);
         assert(micro_store.first.empty());
       } else {
         assert(micro_store.first.size() < tt_max_micro_store_size_per_node);
-        tt_rpc_counts->progress_timer.progress(std::min((CountType)32, tt_max_micro_store_size_per_node / 16));
+        
       }
     } else if (tt_max_store_size_per_node > 1) {
       TT_SIZE_T thread_num = splits->thread_from_full(target_rank);
@@ -1003,14 +995,15 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
         auto &micro_store = tt_micro_store[node_idx];
         assert((node_idx != splits->node_me() || micro_store.first.empty()) && "micro store to own node is empty");
         if (micro_store.first.size() > 0) {
-          tt_rpc_counts->progress_timer.discharge();
+          
           append_shared_store(node_idx);
         }
         assert(micro_store.first.empty() && micro_store.second.empty());
       }
     }  // else no micro_stores
 
-    BarrierTimer bt1(splits->thread_team(), "ThreeTierAggrStore::flush_updates - local append updates - " + this->description);
+      upcxx::barrier(splits->thread_team());
+    
 
     DBG("3TAS::flush_updates sending node stores\n");
     // now call update_remote for any tt_store owned by this rank
@@ -1032,7 +1025,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
             continue;
           }
           if (tt_max_store_size_per_node > 0) {
-            tt_rpc_counts->progress_timer.discharge();
+            
             std::apply(tt_update_remote, std::tuple_cat(std::make_tuple(this, node_idx), this->data));
           }
           assert(tt_store[node_idx].local()->empty());
@@ -1044,8 +1037,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
         }
       }
     }
-    tt_rpc_counts->progress_timer.discharge();
-
+   
     // flush flat aggr store (thread team) no-wait
     ((FAS *)this)->flush_updates(true);
 
@@ -1053,7 +1045,8 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
       return;
     } else {
       // must wait for other ranks in the thread team to send their node stores
-      BarrierTimer bt2a(splits->thread_team(), "ThreeTierAggrStore::flush_updates wait first flush - " + this->description);
+        upcxx::barrier(splits->thread_team());
+      
     }
     // tell the target node how many rpcs this thread_team() has sent to it
     for (node_num_t i = 0; !flat_mode && i < splits->node_n(); i++) {
@@ -1078,20 +1071,23 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
                 },
                 tt_rpc_counts, num_sent, num_processed, my_node);
         do {
-          tt_rpc_counts->progress_timer.progress();  // call progress after firing a rpc
+          
           fut = limit_outstanding_futures(fut);
         } while (!fut.ready());
       }
     }
     auto fut_done = flush_outstanding_futures_async();
-    while (!fut_done.ready()) {
-      tt_rpc_counts->progress_timer.discharge();
-    }
+      fut_done.wait()
+      //int j=0;
+    //while (!fut_done.ready()) {
+       // j+=0;
+        
+    //}
 
     DBG("Waiting for quiescence of counts\n");
 
-    BarrierTimer bt2(splits->full_team(), "ThreeTierAggrStore::flush_updates - quiescence - " + this->description);
-
+      upcxx::barrier(splits->full_team());
+    
     auto max_updates_fut = upcxx::reduce_all(tt_updates, op_fast_max, splits->full_team());
     auto sum_updates_fut = upcxx::reduce_all(tt_updates, op_fast_add, splits->full_team());
 
@@ -1104,7 +1100,7 @@ class ThreeTierAggrStore : public FlatAggrStore<T, Data...> {
       DBG("Waiting for node ", node_idx, "of", splits->node_n(), " expected=", counts.local()->rpcs_expected.load(),
           " == processed (so far)=", counts.local()->rpcs_processed.load(), "\n");
       while (counts.local()->rpcs_expected != counts.local()->rpcs_processed) {
-        tt_rpc_counts->progress_timer.discharge();
+        
         // DBG_VERBOSE("node=", node_idx, " expect=", counts.local()->rpcs_expected.load(), " processed=",
         // counts.local()->rpcs_processed.load(), " progressed=", counts.local()->rpcs_progressed.load(), "\n");
         assert(counts.local()->rpcs_expected >= counts.local()->rpcs_processed && "more expected than processed");

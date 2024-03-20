@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cassert>
+#include <math.h>
 #include <upcxx/upcxx.hpp>
 
 #include "upcxx_utils/log.hpp"
@@ -70,7 +72,7 @@ string get_self_stat(void) {
 #ifndef UPCXX_UTILS_NO_THREADS
 
 void MemoryTrackerThread::start() {
-  barrier();
+	upcxx::barrier();
   if (IN_NODE_TEAM()) start_free_mem = get_free_mem();
   start_free_mem = upcxx::broadcast(start_free_mem, 0, local_team()).wait();
   auto msm_fut = upcxx_utils::min_sum_max_reduce_one(start_free_mem, 0);
@@ -121,7 +123,7 @@ void MemoryTrackerThread::start() {
   }
 
   auto msm = msm_fut.wait();
-  barrier(local_team());
+  upcxx::barrier(local_team());
   double delta_mem;
   if (IN_NODE_TEAM()) delta_mem = start_free_mem - get_free_mem();
   delta_mem = upcxx::broadcast(delta_mem, 0, local_team()).wait();
@@ -135,7 +137,7 @@ void MemoryTrackerThread::start() {
                get_size_str(msm2.sum / upcxx::local_team().rank_n()), " (", get_size_str((double)msm2.avg), " avg, ",
                get_size_str(msm2.min), " min, ", get_size_str(msm2.max), " max)\n");
   min_free_mem = start_free_mem;
-  barrier();
+  upcxx::barrier();
 }
 
 void MemoryTrackerThread::stop() {
@@ -147,7 +149,7 @@ void MemoryTrackerThread::stop() {
     }
     t = nullptr;
   }
-  barrier(local_team());
+  upcxx::barrier(local_team());
   double peak_mem;
   if (IN_NODE_TEAM()) peak_mem = start_free_mem - min_free_mem;
   peak_mem = upcxx::broadcast(peak_mem, 0, local_team()).wait();

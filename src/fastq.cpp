@@ -298,7 +298,7 @@ FastqReader::FastqReader(const string &_fname, bool wait, upcxx::future<> first_
     fqr2->open_fut = open_fut;
     future<> free_mem =
         open_fut.then([sh_promstartstop1, sh_promstartstop2, sh_prombarrier]() {});  // keep shared_ptrs alive until finished
-    upcxx_utils::Timings::set_pending(free_mem);                                     // eventualy will clean up
+    //upcxx_utils::Timings::set_pending(free_mem);                                     // eventualy will clean up
   }
 
   if (wait) {

@@ -112,7 +112,7 @@ class HashTableInserter {
 
   void insert_into_local_hashtable(dist_object<KmerMap<MAX_K>> &local_kmers);
 
-  void get_elapsed_time(double &insert_time, double &kernel_time);
+  //void get_elapsed_time(double &insert_time, double &kernel_time);
 };
 
 template <int MAX_K>
@@ -125,7 +125,7 @@ class KmerDHT {
   int64_t max_kmer_store_bytes;
   int64_t my_num_kmers;
   int max_rpcs_in_flight;
-  std::chrono::time_point<std::chrono::high_resolution_clock> start_t;
+  //std::chrono::time_point<std::chrono::high_resolution_clock> start_t;
 
   int minimizer_len = 15;
 
@@ -168,5 +168,5 @@ class KmerDHT {
 
   typename KmerMap<MAX_K>::iterator local_kmers_end();
 
-  int32_t get_time_offset_us();
+//  int32_t get_time_offset_us();
 };

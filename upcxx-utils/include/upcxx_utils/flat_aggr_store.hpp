@@ -8,7 +8,7 @@
 #include "upcxx_utils/heavy_hitter_streaming_store.hpp"
 #include "upcxx_utils/limit_outstanding.hpp"
 #include "upcxx_utils/log.hpp"
-#include "upcxx_utils/timers.hpp"
+
 
 using std::string;
 using std::to_string;
@@ -35,6 +35,7 @@ using upcxx::view;
 
 namespace upcxx_utils {
 
+
 // this class aggregates updates into local buffers and then periodically does an rpc to dispatch them
 
 struct TargetRPCCounts {
@@ -55,8 +56,8 @@ struct FASRPCCounts {
 
   TargetRPCCounts total;
   vector<TargetRPCCounts> targets;
-  IntermittentTimer rpc_prep_timer, rpc_inner_timer, rpc_outer_timer, wait_for_rpcs_timer, append_store_timer;
-  ProgressTimer progress_timer;
+  //IntermittentTimer rpc_prep_timer, rpc_inner_timer, rpc_outer_timer, wait_for_rpcs_timer, append_store_timer;
+  //ProgressTimer progress_timer;
   const upcxx::team &tm;
   FASRPCCounts(const upcxx::team &tm = upcxx::world());
   void init();
@@ -153,7 +154,7 @@ class FlatAggrStore {
   {
     DBG_VERBOSE("source_rank=", source_rank, ",  rank_store.size()=", rank_store.size(), "\n");
 
-    rpc_counts->rpc_inner_timer.start();
+    
 
     // increment the processed counters
     rpc_counts->set_progressed_count(source_rank, num_progressed);
@@ -172,7 +173,7 @@ class FlatAggrStore {
 
     assert((intrank_t)rpc_counts->targets.size() > source_rank);
     rpc_counts->increment_processed_counters(source_rank);
-    rpc_counts->rpc_inner_timer.stop();
+    
   };
 
   template <typename ViewType>
@@ -190,13 +191,13 @@ class FlatAggrStore {
     DBG_VERBOSE("update_remote_rpc_ff() target_rank=", target_rank, "\n");
 
     increment_rpc_counters(rpc_counts, target_rank);
-    rpc_counts->rpc_outer_timer.start();
+    
     rpc_ff(aggr_team, target_rank, rpc_update_func, update_func, elems,
 #ifdef USE_HH
            hh,
 #endif
            rpc_counts, aggr_team.rank_me(), rpc_counts->targets[target_rank].rpcs_processed, data...);
-    rpc_counts->rpc_outer_timer.stop();
+    
   }
 
   // operates on a vector of elements in the store
@@ -218,16 +219,16 @@ class FlatAggrStore {
 #endif
     wait_for_rpcs(astore, target_rank);
 
-    astore->rpc_counts->rpc_prep_timer.start();
+    
     auto elems_view = make_view(astore->store[target_rank].begin(), astore->store[target_rank].end());
-    astore->rpc_counts->rpc_prep_timer.stop();
+    
 #ifdef USE_HH
     update_remote_rpc_ff(astore->aggr_team, target_rank, astore->update_func, elems_view, hh, astore->rpc_counts, data...);
 #else
     update_remote_rpc_ff(astore->aggr_team, target_rank, astore->update_func, elems_view, astore->rpc_counts, data...);
 #endif
     astore->store[target_rank].clear();
-    astore->rpc_counts->progress_timer.progress();  // call progress after firing a rpc
+    
   }
 
   // operates on a single element
@@ -239,23 +240,22 @@ class FlatAggrStore {
     DBG_VERBOSE("update_remote1() target_rank=", target_rank, "\n");
     wait_for_rpcs(astore, target_rank);
     increment_rpc_counters(astore->rpc_counts, target_rank);
-    astore->rpc_counts->rpc_outer_timer.start();
+    
     rpc_ff(astore->aggr_team, target_rank,
            [](DistUpdateFunc &update_func, T elem, DistRPCCounts &rpc_counts, intrank_t source_rank, CountType num_progressed,
               Data &... data) {
              DBG_VERBOSE("update_remote1::rpc_ff() source_rank=", source_rank, "\n");
-             rpc_counts->rpc_inner_timer.start();
+             
              rpc_counts->set_progressed_count(source_rank, num_progressed);
 
              (*update_func)(elem, data...);
 
              rpc_counts->increment_processed_counters(source_rank);
-             rpc_counts->rpc_inner_timer.stop();
+             
            },
            astore->update_func, elem, astore->rpc_counts, astore->aggr_team.rank_me(),
            astore->rpc_counts->targets[target_rank].rpcs_processed, data...);
-    astore->rpc_counts->rpc_outer_timer.stop();
-    astore->rpc_counts->progress_timer.progress();  // call progress after firing a rpc
+   
   }
 
   void init_rpc_counts() {
@@ -395,7 +395,7 @@ class FlatAggrStore {
     updates_remote++;
 
     if (max_store_size_per_target > 1) {
-      rpc_counts->append_store_timer.start();
+      
       if ((intrank_t)store.size() != aggr_team.rank_n())
         DIE("Invalid state.  set_size must be called after construction or clear()\n");
 #ifdef USE_HH
@@ -405,9 +405,8 @@ class FlatAggrStore {
 #else
       store[target_rank].push_back(elem);
 #endif
-      rpc_counts->append_store_timer.stop();
+    
       if (store[target_rank].size() < max_store_size_per_target) {
-        rpc_counts->progress_timer.progress(std::min((CountType)32, max_store_size_per_target / 16));
         return;
       }
       std::apply(update_remote, std::tuple_cat(std::make_tuple(this, target_rank), data));
@@ -440,12 +439,10 @@ class FlatAggrStore {
     for (int i = 0; i < aggr_team.rank_n(); i++) {
       intrank_t target_rank = (aggr_team.rank_me() + i) % aggr_team.rank_n();
       if (max_store_size_per_target > 0) {
-        rpc_counts->progress_timer.discharge();
         std::apply(update_remote, std::tuple_cat(std::make_tuple(this, target_rank), data));
       }
     }
-    rpc_counts->progress_timer.discharge();
-
+    
     if (no_wait) {
       return;
     }
@@ -467,7 +464,7 @@ class FlatAggrStore {
               },
               rpc_counts, num_sent, num_processed, aggr_team.rank_me());
       do {
-        rpc_counts->progress_timer.progress();  // call progress after firing a rpc
+       
         fut = limit_outstanding_futures(fut);
       } while (!fut.ready());
     }
@@ -478,14 +475,17 @@ class FlatAggrStore {
 
     DBG("flush_updates() waiting for counts\n");
     auto fut_done = flush_outstanding_futures_async();
-    while (!fut_done.ready()) {
-      rpc_counts->progress_timer.discharge();
-    }
+      fut_done.wait();
+      //int dummy=0;
+    //while (!fut_done.ready()) {
+        //dummy++;
+    //}
 
     DBG("flush_updates() waiting for quiescence of counts\n");
 
     // fully timed barrier after all counts have been sent and surrounding quiescence
-    BarrierTimer bt(aggr_team, "FlatAggrStore::flush_updates - quiescence - " + description);
+      upcxx::barrier(aggr_team);
+    
     CountType tot_rpcs_processed = 0;
     if ((intrank_t)rpc_counts->targets.size() != aggr_team.rank_n())
       DIE("Inconsistent number or targets ", rpc_counts->targets.size(), " and team size ", aggr_team.rank_n(), "\n");
@@ -495,7 +495,7 @@ class FlatAggrStore {
       DBG("Waiting for rank ", i, "of", rpc_counts->targets.size(), " expected=", rcounts.rpcs_expected,
           " == processed (so far)=", rcounts.rpcs_processed, "\n");
       while (rcounts.rpcs_expected != rcounts.rpcs_processed) {
-        rpc_counts->progress_timer.discharge();
+        
         assert(rcounts.rpcs_expected >= rcounts.rpcs_processed && "more expected than processed");
       }
       tot_rpcs_processed += rcounts.rpcs_processed;
